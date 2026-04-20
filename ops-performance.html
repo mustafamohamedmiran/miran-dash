@@ -1535,50 +1535,40 @@ function exportCurrentMonth(){
   XLSX.writeFile(wb,'Miran_OPS_'+meta.key+'.xlsx');toast(T('monthExp'));
 }
 
-// ═══════════════════ AUTO-LOAD FROM REPO XLSX ═══════════════════
+// ═══════════════════ AUTO-LOAD FROM GOOGLE SHEETS ═══════════════════
+var GSHEET_ID='1kXD8meONNAq1sHElThFbAdm-MzhpLHr6qrYj-WrzACg';
 function autoLoadFromRepo(){
-  fetch('Miran_OPS_2025-01.xlsx')
-    .then(function(r){if(!r.ok)throw new Error('not found');return r.arrayBuffer();})
-    .then(function(buf){
-      var wb=XLSX.read(buf,{type:'array'});
-      var imported=0;
-      wb.SheetNames.forEach(function(sn){
-        if(sn.toLowerCase().includes('تعليم')||sn.toLowerCase().includes('instruc'))return;
-        var ws=wb.Sheets[sn];
-        var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-        if(rows.length<2)return;
-        var mk=null;
-        ML.forEach(function(m){
-          if(mk)return;
-          var label=ml(m).toLowerCase();var sheet=sn.toLowerCase().trim();
-          if(sheet===label||sheet.includes(label)||label.includes(sheet))mk=m.key;
-          if(!mk&&m.key===sn.trim())mk=m.key;
+  var url='https://docs.google.com/spreadsheets/d/'+GSHEET_ID+'/pub?output=csv&gid=0';
+  fetch(url)
+    .then(function(r){if(!r.ok)throw new Error('failed');return r.text();})
+    .then(function(csv){
+      var wb=XLSX.read(csv,{type:'string'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2)return;
+      var mk='2025-01';
+      var headers=rows[0].map(function(h){return String(h).trim().toLowerCase();});
+      var kc=headers.findIndex(function(h){return h.includes('kpi')||h.includes('name')||h.includes('اسم')||h.includes('مؤشر');});
+      var vc=headers.findIndex(function(h){return h.includes('value')||h.includes('actual')||h.includes('قيمة')||h.includes('فعلي');});
+      var md={};var matched=0;
+      if(kc!==-1&&vc!==-1){
+        rows.slice(1).forEach(function(row){
+          var name=String(row[kc]||'').trim().toLowerCase();var val=row[vc];
+          if(!name||val==='')return;
+          var k=state.kpis.find(function(x){return x.name.toLowerCase()===name||(x.nameEn&&x.nameEn.toLowerCase()===name)||x.name.toLowerCase().includes(name);});
+          if(k){md[k.id]=val;matched++;}
         });
-        if(!mk)mk='2025-01';
-        var headers=rows[0].map(function(h){return String(h).trim().toLowerCase();});
-        var kc=headers.findIndex(function(h){return h.includes('kpi')||h.includes('name')||h.includes('اسم')||h.includes('مؤشر');});
-        var vc=headers.findIndex(function(h){return h.includes('value')||h.includes('actual')||h.includes('قيمة')||h.includes('فعلي');});
-        var md={};var matched=0;
-        if(kc!==-1&&vc!==-1){
-          rows.slice(1).forEach(function(row){
-            var name=String(row[kc]||'').trim().toLowerCase();var val=row[vc];
-            if(!name||val==='')return;
-            var k=state.kpis.find(function(x){return x.name.toLowerCase()===name||(x.nameEn&&x.nameEn.toLowerCase()===name)||x.name.toLowerCase().includes(name);});
-            if(k){md[k.id]=val;matched++;}
-          });
-        }else{
-          var kpis=[].concat(state.kpis).sort(function(a,b){return a.team.localeCompare(b.team)||a.order-b.order;});
-          rows.slice(1).forEach(function(row,i){if(i>=kpis.length)return;var val=row[1]!==undefined?row[1]:row[0];if(val!==''&&val!==null){md[kpis[i].id]=val;matched++;}});
-        }
-        if(matched>0){
-          state.data[mk]=md;
-          var ex=state.uploadLog.findIndex(function(u){return u.monthKey===mk;});
-          var lg={monthKey:mk,date:new Date().toLocaleDateString(lang==='ar'?'ar-SA':'en-US',{year:'numeric',month:'long',day:'numeric'}),count:matched};
-          if(ex>=0)state.uploadLog[ex]=lg;else state.uploadLog.unshift(lg);
-          imported+=matched;
-        }
-      });
-      if(imported>0){saveState();renderSidebar();renderMain();}
+      }else{
+        var kpis=[].concat(state.kpis).sort(function(a,b){return a.team.localeCompare(b.team)||a.order-b.order;});
+        rows.slice(1).forEach(function(row,i){if(i>=kpis.length)return;var val=row[1]!==undefined?row[1]:row[0];if(val!==''&&val!==null){md[kpis[i].id]=val;matched++;}});
+      }
+      if(matched>0){
+        state.data[mk]=md;
+        var ex=state.uploadLog.findIndex(function(u){return u.monthKey===mk;});
+        var lg={monthKey:mk,date:new Date().toLocaleDateString(lang==='ar'?'ar-SA':'en-US',{year:'numeric',month:'long',day:'numeric'}),count:matched};
+        if(ex>=0)state.uploadLog[ex]=lg;else state.uploadLog.unshift(lg);
+        saveState();renderSidebar();renderMain();
+      }
     })
     .catch(function(){});
 }
