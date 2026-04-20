@@ -4,7 +4,8 @@
       "Bash(where git *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(curl -L \"https://docs.google.com/spreadsheets/d/1kXD8meONNAq1sHElThFbAdm-MzhpLHr6qrYj-WrzACg/export?format=csv&gid=0\")"
     ]
   }
 }
